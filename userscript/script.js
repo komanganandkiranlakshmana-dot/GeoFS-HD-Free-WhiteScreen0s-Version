@@ -2,7 +2,7 @@
 // @name         Better Resolution Terrain - WhiteScreen0's Version
 // @namespace    http://tampermonkey.net/
 // @version      2026-04-16
-// @description  Injects HD terrain with a 10-second safety delay
+// @description  Automatically loads HD after the page loads without even using console
 // @author       drakeerv (@WhiteScreen0 from youtube edited this to be compatible with Tampermonkey)
 // @match        https://www.geo-fs.com/geofs.php?v=*
 // @grant        none
