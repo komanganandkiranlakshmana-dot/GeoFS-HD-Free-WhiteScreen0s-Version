@@ -1,87 +1,93 @@
 // ==UserScript==
-// @name         Better Resolution Terrain
+// @name         Better Resolution Terrain - WhiteScreen0's Version
 // @namespace    http://tampermonkey.net/
-// @version      2024-01-21
-// @description  Gets higher resolution images and blocks ads
-// @author       drakeerv
+// @version      2026-04-16
+// @description  Injects HD terrain with a 10-second safety delay
+// @author       drakeerv (@WhiteScreen0 from youtube edited this to be compatible with Tampermonkey)
 // @match        https://www.geo-fs.com/geofs.php?v=*
-// @icon         https://www.google.com/s2/favicons?sz=64&domain=geo-fs.com
 // @grant        none
-// @license      MIT
 // ==/UserScript==
+
+// USE TAMPERMONKEY FIRST, CREATE NEW SCRIPT ON IT, AND COPY THIS AND PASTE IT IN THERE.
 
 (function() {
     "use strict";
 
-    const provider = "google";
-    const multiplayerServer = "default"
+    function runInConsole() {
+        console.log("GeoFS HD: Script injected! Waiting 10 seconds for the game to stabilize...");
 
-    window.geofsNewHDState = true;
-    window.geofs.geoIpUpdate = function() {
-        delete window.geofs.api.analytics;
-        document.body.classList.add("geofs-hd");
+        setTimeout(function() {
+            console.log("GeoFS HD: 10 seconds passed. Applying modifications now.");
 
-        if (multiplayerServer !== "default") {
-            window.geofs.multiplayerHost = multiplayerServer;
-        }
+            const provider = "google";
+            const multiplayerServer = "default";
 
-        switch (provider) {
-            case "cache":
-                window.geofs.api.imageryProvider = new window.Cesium.UrlTemplateImageryProvider({
-                    maximumLevel: 21,
-                    hasAlphaChannel: false,
-                    subdomains: "abcdefghijklmnopqrstuvwxyz".split(""),
-                    url: "http://localhost/map/{z}/{x}/{y}"
+            
+            window.geofsNewHDState = true;
+
+            
+            if (window.geofs) {
+                window.geofs.geoIpUpdate = function() {
+                    console.log("GeoFS HD: geofs.geoIpUpdate triggered.");
+                    delete window.geofs.api.analytics;
+                    document.body.classList.add("geofs-hd");
+
+                    if (multiplayerServer !== "default") {
+                        window.geofs.multiplayerHost = multiplayerServer;
+                    }
+
+                    
+                    if (window.Cesium) {
+                        applyImagery(provider);
+                    }
+                };
+
+                
+                window.executeOnEventDone("geofsStarted", function() {
+                    console.log("GeoFS HD: geofsStarted event detected.");
+                    if (window.geofs.api.hdOn === window.geofsNewHDState) return;
+                    window.jQuery("body").trigger("terrainProviderWillUpdate");
+                    window.geofs.geoIpUpdate();
+                    window.geofs.api.hdOn = window.geofsNewHDState;
+                    window.geofs.api.renderingQuality();
+                    window.jQuery("body").trigger("terrainProviderUpdate");
                 });
-                break;
-            case "google":
-                window.geofs.api.imageryProvider = new window.Cesium.UrlTemplateImageryProvider({
-                    maximumLevel: 21,
-                    hasAlphaChannel: false,
-                    subdomains: ["mt0", "mt1", "mt2", "mt3"],
-                    url: "https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}"
-                });
-                break;
-            case "apple":
-                window.geofs.api.imageryProvider = new window.Cesium.UrlTemplateImageryProvider({
-                    maximumLevel: 21,
-                    hasAlphaChannel: false,
-                    subdomains: ["sat-cdn1", "sat-cdn2", "sat-cdn3", "sat-cdn4"],
-                    url: "https://{s}.apple-mapkit.com/tile?style=7&size=1&scale=1&z={z}&x={x}&y={y}&v=9651&accessKey=1705988638_4603104305979553294_%2F_Qvq1XXyXG5w0IUYlFOsIQsxLt2ALxm32i%2BAMbLIFD5s%3D"
-                });
-                break;
-            case "bing":
-                window.geofs.api.imageryProvider = new window.Cesium.BingMapsImageryProvider({
-                    url: "https://dev.virtualearth.net",
-                    key: "AjrgR5TNicgFReuFwvNH71v4YeQNkXIB20l63ZMm86mVuBGZPhTHMkdiVq2_9L7x",
-                    mapStyle: window.Cesium.BingMapsStyle.AERIAL
-                });
-                break;
-            default: break
-        }
 
-        window.geofs.api.setImageryProvider(window.geofs.api.imageryProvider, false);
-        window.geofs.api.viewer.terrainProvider = window.geofs.api.flatRunwayTerrainProviderInstance = new window.geofs.api.FlatRunwayTerrainProvider({
-            baseProvider: new window.Cesium.CesiumTerrainProvider({
-                url: "https://data.geo-fs.com/srtm/",
-                requestWaterMask: false,
-                requestVertexNormals: true
-            }),
-            bypass: false,
-            maximumLevel: 12
-        });
-    };
-    window.executeOnEventDone("geofsStarted", function() {
-        if (window.geofs.api.hdOn === window.geofsNewHDState) return;
-        window.jQuery("body").trigger("terrainProviderWillUpdate");
-        window.geofs.geoIpUpdate();
-        window.geofs.api.hdOn = window.geofsNewHDState;
-        window.geofs.api.renderingQuality();
-        window.jQuery("body").trigger("terrainProviderUpdate");
-    });
-    window.executeOnEventDone("afterDeferredload", function() {
-        window.geofs.mapXYZ = "https://data.geo-fs.com/osm/{z}/{x}/{y}.png";
-    });
+                window.executeOnEventDone("afterDeferredload", function() {
+                    window.geofs.mapXYZ = "https://data.geo-fs.com/osm/{z}/{x}/{y}.png";
+                });
+            } else {
+                console.error("GeoFS HD Error: window.geofs object not found even after 10 seconds.");
+            }
 
-    //document.querySelectorAll("body > div.geofs-adbanner.geofs-adsense-container")[0].remove();
+            
+            function applyImagery(choice) {
+                let newProvider;
+                const cesium = window.Cesium;
+
+                if (choice === "google") {
+                    newProvider = new cesium.UrlTemplateImageryProvider({
+                        maximumLevel: 21,
+                        hasAlphaChannel: false,
+                        subdomains: ["mt0", "mt1", "mt2", "mt3"],
+                        url: "https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}"
+                    });
+                }
+                
+
+                if (newProvider) {
+                    window.geofs.api.imageryProvider = newProvider;
+                    window.geofs.api.setImageryProvider(newProvider, false);
+                }
+            }
+
+        }, 10000);
+    }
+
+
+    const script = document.createElement('script');
+    script.textContent = '(' + runInConsole.toString() + ')();';
+    (document.head || document.documentElement).appendChild(script);
+    script.remove();
+
 })();
